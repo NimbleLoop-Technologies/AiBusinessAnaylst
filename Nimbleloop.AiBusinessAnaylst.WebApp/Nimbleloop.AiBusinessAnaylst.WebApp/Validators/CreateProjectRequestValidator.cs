@@ -18,7 +18,7 @@ public class CreateProjectRequestValidator : AbstractValidator<CreateProjectRequ
 			.MaximumLength(5000).WithMessage("Technical details must not exceed 5000 characters.");
 
 		RuleFor(x => x.ClickUpListId)
-			.Matches(@"^[a-zA-Z0-9\-]+$")
+			.Matches(@"^[a-zA-Z0-9-]+$")
 			.When(x => !string.IsNullOrEmpty(x.ClickUpListId))
 			.WithMessage("ClickUp List ID must contain only alphanumeric characters and hyphens.");
 	}

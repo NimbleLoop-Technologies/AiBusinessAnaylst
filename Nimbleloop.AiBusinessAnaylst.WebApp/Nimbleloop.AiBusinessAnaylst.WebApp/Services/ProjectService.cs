@@ -4,7 +4,10 @@ using Nimbleloop.AiBusinessAnaylst.WebApp.Models;
 
 namespace Nimbleloop.AiBusinessAnaylst.WebApp.Services;
 
-public class ProjectService(ApplicationDbContext dbContext, IHttpClientFactory httpClientFactory) : IProjectService
+public class ProjectService(
+	ApplicationDbContext dbContext,
+	IHttpClientFactory httpClientFactory,
+	ILogger<ProjectService> logger) : IProjectService
 {
 	public async Task<List<ProjectResponse>> GetProjectsAsync(string userId)
 	{
@@ -54,10 +57,9 @@ public class ProjectService(ApplicationDbContext dbContext, IHttpClientFactory h
 					$"The ClickUp List ID '{clickUpListId}' could not be validated. Please check the ID and try again.");
 			}
 		}
-		catch (HttpRequestException)
+		catch (HttpRequestException ex)
 		{
-			// If the ClickUp API is unreachable, allow creation but log the issue
-			// This ensures the app works even without a valid ClickUp API key configured
+			logger.LogWarning(ex, "ClickUp API is unreachable. Skipping validation for List ID '{ClickUpListId}'.", clickUpListId);
 		}
 	}
 

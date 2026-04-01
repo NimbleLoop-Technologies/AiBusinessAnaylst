@@ -13,8 +13,8 @@ public static class ProjectEndpoints
 
 		group.MapGet("/", async (ClaimsPrincipal user, IProjectService projectService) =>
 		{
-			var userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
-			if (string.IsNullOrEmpty(userId))
+			var userId = GetUserId(user);
+			if (userId is null)
 			{
 				return Results.Unauthorized();
 			}
@@ -29,8 +29,8 @@ public static class ProjectEndpoints
 			IValidator<CreateProjectRequest> validator,
 			IProjectService projectService) =>
 		{
-			var userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
-			if (string.IsNullOrEmpty(userId))
+			var userId = GetUserId(user);
+			if (userId is null)
 			{
 				return Results.Unauthorized();
 			}
@@ -53,5 +53,10 @@ public static class ProjectEndpoints
 		});
 
 		return endpoints;
+	}
+
+	private static string? GetUserId(ClaimsPrincipal user)
+	{
+		return user.FindFirstValue(ClaimTypes.NameIdentifier);
 	}
 }
