@@ -1,9 +1,12 @@
+using FluentValidation;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using MongoDB.Driver;
 using Nimbleloop.AiBusinessAnaylst.WebApp.Client.Pages;
 using Nimbleloop.AiBusinessAnaylst.WebApp.Components;
 using Nimbleloop.AiBusinessAnaylst.WebApp.Components.Account;
 using Nimbleloop.AiBusinessAnaylst.WebApp.Data;
+using OpenAI;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,9 +26,11 @@ builder.Services.AddAuthentication(options =>
 		.AddIdentityCookies();
 builder.Services.AddAuthorization();
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+// MongoDB / Azure Cosmos DB (Mongo API)
+var mongoConnectionString = builder.Configuration.GetConnectionString("MongoDb") ?? throw new InvalidOperationException("Connection string 'MongoDb' not found.");
+var mongoDatabaseName = builder.Configuration["MongoDb:DatabaseName"] ?? "AiBusinessAnalyst";
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-		options.UseSqlServer(connectionString));
+		options.UseMongoDB(mongoConnectionString, mongoDatabaseName));
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 builder.Services.AddIdentityCore<ApplicationUser>(options =>
@@ -38,6 +43,36 @@ builder.Services.AddIdentityCore<ApplicationUser>(options =>
 		.AddDefaultTokenProviders();
 
 builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
+
+// FluentValidation
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+
+// OpenAI
+var openAiApiKey = builder.Configuration["OpenAI:ApiKey"];
+if (!string.IsNullOrEmpty(openAiApiKey))
+{
+	builder.Services.AddSingleton(new OpenAIClient(openAiApiKey));
+}
+
+// Anthropic
+var anthropicApiKey = builder.Configuration["Anthropic:ApiKey"];
+if (!string.IsNullOrEmpty(anthropicApiKey))
+{
+	builder.Services.AddSingleton(new Anthropic.SDK.AnthropicClient(new Anthropic.SDK.APIAuthentication(anthropicApiKey)));
+}
+
+// ClickUp API HttpClient
+builder.Services.AddHttpClient("ClickUp", client =>
+{
+	var clickUpBaseUrl = builder.Configuration["ClickUp:BaseUrl"] ?? "https://api.clickup.com/api/v2";
+	client.BaseAddress = new Uri(clickUpBaseUrl);
+
+	var clickUpApiKey = builder.Configuration["ClickUp:ApiKey"];
+	if (!string.IsNullOrEmpty(clickUpApiKey))
+	{
+		client.DefaultRequestHeaders.Add("Authorization", clickUpApiKey);
+	}
+});
 
 var app = builder.Build();
 
