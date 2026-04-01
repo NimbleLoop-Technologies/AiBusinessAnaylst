@@ -11,12 +11,21 @@ public class ProjectService(
 {
 	public async Task<List<ProjectResponse>> GetProjectsAsync(string userId)
 	{
-		var projects = await dbContext.Projects
+		List<ProjectResponse> projects = await dbContext.Projects
 			.Where(p => p.UserId == userId)
 			.OrderByDescending(p => p.CreatedAt)
+			.Select(x => new ProjectResponse
+			{
+				Id = x.Id,
+				Name = x.Name,
+				Description = x.Description,
+				TechnicalDetails = x.TechnicalDetails,
+				ClickUpListId = x.ClickUpListId,
+				CreatedAt = x.CreatedAt,
+				UpdatedAt = x.UpdatedAt
+			})
 			.ToListAsync();
-
-		return projects.Select(MapToResponse).ToList();
+		return projects;
 	}
 
 	public async Task<ProjectResponse> CreateProjectAsync(string userId, CreateProjectRequest request)
@@ -27,7 +36,7 @@ public class ProjectService(
 			await ValidateClickUpListIdAsync(request.ClickUpListId);
 		}
 
-		var project = new Project
+		Project project = new()
 		{
 			Name = request.Name,
 			Description = request.Description,
@@ -42,38 +51,38 @@ public class ProjectService(
 		await dbContext.SaveChangesAsync();
 
 		return MapToResponse(project);
-	}
 
-	private async Task ValidateClickUpListIdAsync(string clickUpListId)
-	{
-		try
+		static ProjectResponse MapToResponse(Project project)
 		{
-			var client = httpClientFactory.CreateClient("ClickUp");
-			var response = await client.GetAsync($"list/{clickUpListId}");
-
-			if (!response.IsSuccessStatusCode)
+			return new ProjectResponse
 			{
-				throw new InvalidOperationException(
-					$"The ClickUp List ID '{clickUpListId}' could not be validated. Please check the ID and try again.");
+				Id = project.Id,
+				Name = project.Name,
+				Description = project.Description,
+				TechnicalDetails = project.TechnicalDetails,
+				ClickUpListId = project.ClickUpListId,
+				CreatedAt = project.CreatedAt,
+				UpdatedAt = project.UpdatedAt
+			};
+		}
+
+		async Task ValidateClickUpListIdAsync(string clickUpListId)
+		{
+			try
+			{
+				HttpClient client = httpClientFactory.CreateClient("ClickUp");
+				HttpResponseMessage response = await client.GetAsync($"list/{clickUpListId}");
+
+				if (!response.IsSuccessStatusCode)
+				{
+					throw new InvalidOperationException(
+						$"The ClickUp List ID '{clickUpListId}' could not be validated. Please check the ID and try again.");
+				}
+			}
+			catch (HttpRequestException ex)
+			{
+				logger.LogWarning(ex, "ClickUp API is unreachable. Skipping validation for List ID '{ClickUpListId}'.", clickUpListId);
 			}
 		}
-		catch (HttpRequestException ex)
-		{
-			logger.LogWarning(ex, "ClickUp API is unreachable. Skipping validation for List ID '{ClickUpListId}'.", clickUpListId);
-		}
-	}
-
-	private static ProjectResponse MapToResponse(Project project)
-	{
-		return new ProjectResponse
-		{
-			Id = project.Id,
-			Name = project.Name,
-			Description = project.Description,
-			TechnicalDetails = project.TechnicalDetails,
-			ClickUpListId = project.ClickUpListId,
-			CreatedAt = project.CreatedAt,
-			UpdatedAt = project.UpdatedAt
-		};
 	}
 }
