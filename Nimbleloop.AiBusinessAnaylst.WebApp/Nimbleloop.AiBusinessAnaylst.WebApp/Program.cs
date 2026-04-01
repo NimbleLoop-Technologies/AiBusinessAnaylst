@@ -6,6 +6,8 @@ using Nimbleloop.AiBusinessAnaylst.WebApp.Client.Pages;
 using Nimbleloop.AiBusinessAnaylst.WebApp.Components;
 using Nimbleloop.AiBusinessAnaylst.WebApp.Components.Account;
 using Nimbleloop.AiBusinessAnaylst.WebApp.Data;
+using Nimbleloop.AiBusinessAnaylst.WebApp.Endpoints;
+using Nimbleloop.AiBusinessAnaylst.WebApp.Services;
 using OpenAI;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -46,6 +48,9 @@ builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSe
 
 // FluentValidation
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+
+// Project Service
+builder.Services.AddScoped<IProjectService, ProjectService>();
 
 // OpenAI
 var openAiApiKey = builder.Configuration["OpenAI:ApiKey"];
@@ -100,5 +105,8 @@ app.MapRazorComponents<App>()
 
 // Add additional endpoints required by the Identity /Account Razor components.
 app.MapAdditionalIdentityEndpoints();
+
+// Add project API endpoints.
+app.MapProjectEndpoints();
 
 app.Run();
