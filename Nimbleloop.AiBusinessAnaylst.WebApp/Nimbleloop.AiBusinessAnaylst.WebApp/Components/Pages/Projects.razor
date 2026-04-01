@@ -1,0 +1,222 @@
+@page "/projects"
+@attribute [StreamRendering]
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+
+@using Nimbleloop.AiBusinessAnaylst.WebApp.Models
+@using Nimbleloop.AiBusinessAnaylst.WebApp.Services
+@using FluentValidation
+
+@inject IProjectService ProjectService
+@inject IValidator<CreateProjectRequest> Validator
+@inject NavigationManager NavigationManager
+
+<PageTitle>Projects</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1>Projects</h1>
+    @if (!showCreateForm)
+    {
+        <button class="btn btn-primary" @onclick="ShowCreateForm">Add New</button>
+    }
+</div>
+
+@if (showCreateForm)
+{
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Create New Project</h5>
+        </div>
+        <div class="card-body">
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger" role="alert">
+                    @errorMessage
+                </div>
+            }
+
+            <EditForm Model="createRequest" OnValidSubmit="HandleCreateProject" FormName="CreateProject">
+                <div class="mb-3">
+                    <label for="projectName" class="form-label">Project Name <span class="text-danger">*</span></label>
+                    <InputText id="projectName" class="form-control" @bind-Value="createRequest.Name" />
+                    @if (validationErrors.ContainsKey(nameof(CreateProjectRequest.Name)))
+                    {
+                        <div class="validation-message">@validationErrors[nameof(CreateProjectRequest.Name)]</div>
+                    }
+                </div>
+
+                <div class="mb-3">
+                    <label for="description" class="form-label">Description</label>
+                    <InputTextArea id="description" class="form-control" rows="3" @bind-Value="createRequest.Description" />
+                    @if (validationErrors.ContainsKey(nameof(CreateProjectRequest.Description)))
+                    {
+                        <div class="validation-message">@validationErrors[nameof(CreateProjectRequest.Description)]</div>
+                    }
+                </div>
+
+                <div class="mb-3">
+                    <label for="technicalDetails" class="form-label">Technical Details</label>
+                    <InputTextArea id="technicalDetails" class="form-control" rows="3" @bind-Value="createRequest.TechnicalDetails" />
+                    @if (validationErrors.ContainsKey(nameof(CreateProjectRequest.TechnicalDetails)))
+                    {
+                        <div class="validation-message">@validationErrors[nameof(CreateProjectRequest.TechnicalDetails)]</div>
+                    }
+                </div>
+
+                <div class="mb-3">
+                    <label for="clickUpListId" class="form-label">ClickUp List ID</label>
+                    <InputText id="clickUpListId" class="form-control" @bind-Value="createRequest.ClickUpListId" />
+                    @if (validationErrors.ContainsKey(nameof(CreateProjectRequest.ClickUpListId)))
+                    {
+                        <div class="validation-message">@validationErrors[nameof(CreateProjectRequest.ClickUpListId)]</div>
+                    }
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary" disabled="@isSubmitting">
+                        @if (isSubmitting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                        }
+                        Save Project
+                    </button>
+                    <button type="button" class="btn btn-secondary" @onclick="CancelCreate" disabled="@isSubmitting">Cancel</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@if (projects == null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (projects.Count == 0)
+{
+    <div class="alert alert-info" role="alert">
+        No projects found. Click <strong>Add New</strong> to create your first project.
+    </div>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Description</th>
+                <th>ClickUp List ID</th>
+                <th>Created</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var project in projects)
+            {
+                <tr>
+                    <td>@project.Name</td>
+                    <td>@(project.Description?.Length > 100 ? project.Description[..100] + "..." : project.Description)</td>
+                    <td>@project.ClickUpListId</td>
+                    <td>@project.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<ProjectResponse>? projects;
+    private CreateProjectRequest createRequest = new();
+    private bool showCreateForm;
+    private bool isSubmitting;
+    private string? errorMessage;
+    private Dictionary<string, string> validationErrors = new();
+
+    [CascadingParameter]
+    private Task<Microsoft.AspNetCore.Components.Authorization.AuthenticationState>? AuthenticationState { get; set; }
+
+    private string? userId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthenticationState != null)
+        {
+            var authState = await AuthenticationState;
+            userId = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        }
+
+        await LoadProjects();
+    }
+
+    private async Task LoadProjects()
+    {
+        if (!string.IsNullOrEmpty(userId))
+        {
+            projects = await ProjectService.GetProjectsAsync(userId);
+        }
+        else
+        {
+            projects = new List<ProjectResponse>();
+        }
+    }
+
+    private void ShowCreateForm()
+    {
+        showCreateForm = true;
+        createRequest = new CreateProjectRequest();
+        errorMessage = null;
+        validationErrors.Clear();
+    }
+
+    private void CancelCreate()
+    {
+        showCreateForm = false;
+        createRequest = new CreateProjectRequest();
+        errorMessage = null;
+        validationErrors.Clear();
+    }
+
+    private async Task HandleCreateProject()
+    {
+        errorMessage = null;
+        validationErrors.Clear();
+
+        var result = await Validator.ValidateAsync(createRequest);
+        if (!result.IsValid)
+        {
+            foreach (var error in result.Errors)
+            {
+                if (!validationErrors.ContainsKey(error.PropertyName))
+                {
+                    validationErrors[error.PropertyName] = error.ErrorMessage;
+                }
+            }
+            return;
+        }
+
+        if (string.IsNullOrEmpty(userId))
+        {
+            errorMessage = "You must be logged in to create a project.";
+            return;
+        }
+
+        isSubmitting = true;
+
+        try
+        {
+            await ProjectService.CreateProjectAsync(userId, createRequest);
+            showCreateForm = false;
+            createRequest = new CreateProjectRequest();
+            await LoadProjects();
+        }
+        catch (InvalidOperationException ex)
+        {
+            errorMessage = ex.Message;
+        }
+        catch (Exception)
+        {
+            errorMessage = "An unexpected error occurred. Please try again.";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+}
